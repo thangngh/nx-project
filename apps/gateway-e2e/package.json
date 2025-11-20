@@ -1,0 +1,26 @@
+{
+  "name": "@nx-project/gateway-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "implicitDependencies": [
+      "@nx-project/gateway"
+    ],
+    "targets": {
+      "e2e": {
+        "executor": "@nx/jest:jest",
+        "outputs": [
+          "{projectRoot}/test-output/jest/coverage"
+        ],
+        "options": {
+          "jestConfig": "apps/gateway-e2e/jest.config.cts",
+          "passWithNoTests": true
+        },
+        "dependsOn": [
+          "@nx-project/gateway:build",
+          "@nx-project/gateway:serve"
+        ]
+      }
+    }
+  }
+}

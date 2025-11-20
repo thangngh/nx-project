@@ -1,0 +1,52 @@
+{
+  "name": "@nx-project/nest-config",
+  "version": "0.0.1",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@nx-project/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!**/*.tsbuildinfo"
+  ],
+  "nx": {
+    "targets": {
+      "test": {
+        "executor": "@nx/jest:jest",
+        "outputs": [
+          "{projectRoot}/test-output/jest/coverage"
+        ],
+        "options": {
+          "jestConfig": "libs/ts/config/jest.config.cts"
+        }
+      },
+      "build": {
+        "executor": "@nx/js:tsc",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "options": {
+          "outputPath": "dist/libs/ts/config",
+          "tsConfig": "libs/ts/config/tsconfig.lib.json",
+          "packageJson": "libs/ts/config/package.json",
+          "main": "libs/ts/config/src/index.ts",
+          "assets": [
+            "libs/ts/config/*.md"
+          ]
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@nestjs/config": "^4.0.2",
+    "tslib": "^2.3.0"
+  }
+}

@@ -2,5 +2,24 @@
   "extends": "./tsconfig.base.json",
   "compileOnSave": false,
   "files": [],
-  "references": []
+  "references": [
+    {
+      "path": "./gateway-e2e"
+    },
+    {
+      "path": "./gateway"
+    },
+    {
+      "path": "./apps/gateway-e2e"
+    },
+    {
+      "path": "./apps/gateway"
+    },
+    {
+      "path": "./libs/ts/config"
+    },
+    {
+      "path": "./libs/ts/decorator"
+    }
+  ]
 }
