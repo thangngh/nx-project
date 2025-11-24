@@ -4,12 +4,6 @@
   "files": [],
   "references": [
     {
-      "path": "./gateway-e2e"
-    },
-    {
-      "path": "./gateway"
-    },
-    {
       "path": "./apps/gateway-e2e"
     },
     {
@@ -20,6 +14,9 @@
     },
     {
       "path": "./libs/ts/decorator"
+    },
+    {
+      "path": "./libs/ts/exception"
     }
   ]
 }
