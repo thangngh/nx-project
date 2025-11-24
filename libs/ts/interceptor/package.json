@@ -1,0 +1,52 @@
+{
+  "name": "@nx-project/interceptor",
+  "version": "0.0.1",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@nx-project/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!**/*.tsbuildinfo"
+  ],
+  "nx": {
+    "targets": {
+      "test": {
+        "executor": "@nx/jest:jest",
+        "outputs": [
+          "{projectRoot}/test-output/jest/coverage"
+        ],
+        "options": {
+          "jestConfig": "libs/ts/interceptor/jest.config.cts"
+        }
+      },
+      "build": {
+        "executor": "@nx/js:tsc",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "options": {
+          "outputPath": "dist/libs/ts/interceptor",
+          "tsConfig": "libs/ts/interceptor/tsconfig.lib.json",
+          "packageJson": "libs/ts/interceptor/package.json",
+          "main": "libs/ts/interceptor/src/index.ts",
+          "assets": [
+            "libs/ts/interceptor/*.md"
+          ]
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "class-transformer": "^0.5.1",
+    "tslib": "^2.3.0"
+  }
+}

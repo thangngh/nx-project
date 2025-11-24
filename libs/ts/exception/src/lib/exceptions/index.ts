@@ -1,3 +1,4 @@
+export * from './base.exception';
 export * from './bad-request.exception';
 export * from './forbidden.exception';
 export * from './internal-server.exception';

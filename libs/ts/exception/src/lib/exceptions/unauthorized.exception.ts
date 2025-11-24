@@ -5,7 +5,7 @@ import { BaseException } from "./base.exception";
 export class UnauthorizedException extends BaseException {
   constructor(
     message = "exception.unauthorized",
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     super(HttpStatus.UNAUTHORIZED, message, metadata);
   }

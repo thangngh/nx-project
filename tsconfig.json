@@ -17,6 +17,9 @@
     },
     {
       "path": "./libs/ts/exception"
+    },
+    {
+      "path": "./libs/ts/interceptor"
     }
   ]
 }

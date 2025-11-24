@@ -9,7 +9,7 @@
 ## Generate a library
 
 ```sh
-npx nx g @nx/js:lib packages/pkg1 --publishable --importPath=@my-org/pkg1
+npx nx g @nx/nest:lib configs --publishable --importPath=@shope-hehe/configs
 ```
 
 ## Run tasks

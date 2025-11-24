@@ -5,7 +5,7 @@ import { BaseException } from "./base.exception";
 export class ForbiddenException extends BaseException {
   constructor(
     message = "exception.forbidden",
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
   ) {
     super(HttpStatus.FORBIDDEN, message, metadata);
   }
