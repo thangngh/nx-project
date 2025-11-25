@@ -20,6 +20,42 @@
     },
     {
       "path": "./libs/ts/interceptor"
+    },
+    {
+      "path": "./libs/shared/ts/logger"
+    },
+    {
+      "path": "./libs/ts/dto"
+    },
+    {
+      "path": "./libs/ts/pipe"
+    },
+    {
+      "path": "./libs/ts/docs"
+    },
+    {
+      "path": "./libs/ts/guard"
+    },
+    {
+      "path": "./libs/ts/strategy"
+    },
+    {
+      "path": "./libs/ts/validation"
+    },
+    {
+      "path": "./libs/ts/cache"
+    },
+    {
+      "path": "./libs/ts/queue"
+    },
+    {
+      "path": "./libs/ts/health"
+    },
+    {
+      "path": "./libs/ts/utils"
+    },
+    {
+      "path": "./libs/ts/testing"
     }
   ]
 }

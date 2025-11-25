@@ -2,7 +2,30 @@
   "name": "@nx-project/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "gen:lib": "nx g @nx/js:lib --directory=libs/ts --importPath=@nx-project --unitTestRunner=jest --bundler=tsc",
+    "gen:shared-lib": "nx g @nx/js:lib --directory=libs/shared/ts --importPath=@nx-project/shared --unitTestRunner=jest --bundler=tsc",
+    "gen:nest-app": "nx g @nx/nest:app --directory=apps",
+    "gen:node-app": "nx g @nx/node:app --directory=apps",
+    "build:all": "nx run-many --target=build --all",
+    "test:all": "nx run-many --target=test --all",
+    "lint:all": "nx run-many --target=lint --all",
+    "build:libs": "nx run-many --target=build --projects=tag:type:lib",
+    "build:apps": "nx run-many --target=build --projects=tag:type:app",
+    "dev:gateway": "nx serve gateway",
+    "dev": "nx serve",
+    "test:watch": "nx test --watch",
+    "test:cov": "nx test --coverage",
+    "e2e": "nx e2e",
+    "format": "nx format:write",
+    "format:check": "nx format:check",
+    "affected:test": "nx affected --target=test",
+    "affected:build": "nx affected --target=build",
+    "graph": "nx graph",
+    "dep-graph": "nx dep-graph",
+    "clean": "nx reset",
+    "clean:all": "nx reset && rm -rf node_modules dist"
+  },
   "private": true,
   "devDependencies": {
     "@eslint/js": "^9.8.0",
@@ -41,7 +64,9 @@
   "workspaces": [
     "packages/*",
     "apps/*",
-    "libs/ts/*"
+    "libs/ts/*",
+    "libs/shared/ts/*",
+    "libs/*"
   ],
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -49,7 +74,8 @@
     "@nestjs/platform-express": "^11.0.0",
     "axios": "^1.6.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.0"
+    "rxjs": "^7.8.0",
+    "winston": "^3.18.3"
   },
   "nx": {
     "includedScripts": [],
