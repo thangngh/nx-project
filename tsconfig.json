@@ -56,6 +56,24 @@
     },
     {
       "path": "./libs/ts/testing"
+    },
+    {
+      "path": "./apps/clients/portal"
+    },
+    {
+      "path": "./apps/clients/admin-e2e"
+    },
+    {
+      "path": "./apps/clients/admin"
+    },
+    {
+      "path": "./libs/frontend/ui"
+    },
+    {
+      "path": "./libs/frontend/hook"
+    },
+    {
+      "path": "./libs/frontend/utils"
     }
   ]
 }
