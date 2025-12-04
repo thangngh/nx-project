@@ -16,6 +16,10 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["@nx-project/source"]
+    "customConditions": ["@nx-project/source"],
+    "paths": {
+      "@nx-project/minio": ["libs/ts/minio/src/index.ts"],
+      "@nx-project/rabbitmq": ["libs/ts/rabbitmq/src/index.ts"]
+    }
   }
 }

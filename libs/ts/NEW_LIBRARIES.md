@@ -2,7 +2,7 @@
 
 ## 📦 Recently Added Libraries
 
-I've added 8 new libraries to `libs/ts/`:
+I've added 10 new libraries to `libs/ts/`:
 
 ### 1. **Guard** (`@nx-project/guard`)
 Authentication and authorization guards:
@@ -53,6 +53,20 @@ Testing utilities and helpers:
 - `TestHelpers` - createTestingModule, mockRepository, mockService
 - `createMock<T>()` - Generic mock factory
 
+### 9. **MinIO** (`@nx-project/minio`) ⭐ NEW
+S3-compatible object storage client:
+- `MinioModule` - NestJS module with forRoot/forRootAsync
+- `MinioService` - Upload, download, presigned URLs
+- **Dependencies**: `minio`
+
+### 10. **RabbitMQ** (`@nx-project/rabbitmq`) ⭐ NEW
+Message queue client for background jobs:
+- `RabbitMQModule` - NestJS module
+- `RabbitMQService` - Publish/consume messages
+- `RabbitMQWorker` - Worker abstractions
+- Queue constants and job types
+- **Dependencies**: `amqplib`
+
 ## 🚀 Usage Examples
 
 ### Guards
@@ -99,9 +113,57 @@ const module = await TestHelpers.createTestingModule({
 });
 ```
 
+### MinIO
+```typescript
+import { MinioModule, MinioService } from '@nx-project/minio';
+
+@Module({
+  imports: [
+    MinioModule.forRoot({
+      endPoint: 'localhost',
+      port: 9000,
+      useSSL: false,
+      accessKey: 'admin',
+      secretKey: '123456789',
+    }),
+  ],
+})
+export class AppModule {}
+
+// In service
+async uploadFile(file: Express.Multer.File) {
+  return this.minioService.upload(file.buffer, file.size, {
+    objectName: file.originalname,
+    contentType: file.mimetype,
+  });
+}
+```
+
+### RabbitMQ
+```typescript
+import { RabbitMQModule, RabbitMQService, Queues, JobTypes } from '@nx-project/rabbitmq';
+
+@Module({
+  imports: [
+    RabbitMQModule.forRoot({
+      url: 'amqp://admin:admin123@localhost:5672',
+      prefetchCount: 5,
+    }),
+  ],
+})
+export class AppModule {}
+
+// Publish a job
+await rabbitMQService.publish(
+  Queues.PDF_EXPORT,
+  JobTypes.PDF_EXPORT_INVOICES,
+  { userId: '123', invoiceIds: ['inv-1', 'inv-2'] }
+);
+```
+
 ## 📊 Complete Library List
 
-Your monorepo now has **16 libraries** in `libs/ts/`:
+Your monorepo now has **18 libraries** in `libs/ts/`:
 
 1. ✅ config - Configuration management
 2. ✅ decorator - Custom decorators
@@ -119,6 +181,8 @@ Your monorepo now has **16 libraries** in `libs/ts/`:
 14. ✅ **health** - Health check indicators
 15. ✅ **utils** - Common utilities
 16. ✅ **testing** - Testing helpers
+17. ✅ **minio** - MinIO/S3 object storage ⭐
+18. ✅ **rabbitmq** - RabbitMQ message queue ⭐
 
 Plus **1 shared library**:
 - ✅ shared/ts/logger - Winston logger service
@@ -131,3 +195,4 @@ Plus **1 shared library**:
 4. Add `.ts` extensions to all imports
 
 See `QUICK_START.md` for usage instructions.
+

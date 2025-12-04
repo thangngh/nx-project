@@ -1,1 +1,1 @@
-export * from './lib/decorator.module';
+export * from './lib/decorator.module.ts';

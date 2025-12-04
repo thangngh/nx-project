@@ -1,0 +1,220 @@
+version: '3.2'
+
+services:
+  zookeeper:
+    container_name: zookeeper
+    image: confluentinc/cp-zookeeper:7.5.0
+    ports:
+      - "2181:2181"
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    networks:
+      - message-queue
+    volumes:
+      - ${DATA_PATH:-./data}/zookeeper:/var/lib/zookeeper
+  kafka:
+    container_name: kafka
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+    networks:
+      - message-queue
+    volumes:
+      - ${DATA_PATH:-./data}/kafka:/var/lib/kafka
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local-cluster
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    networks:
+      - message-queue
+  minio:
+    image: minio/minio
+    container_name: minio
+    restart: always
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=123456789
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ${DATA_PATH:-./data}/minio:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - minio_network
+  
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ${DATA_PATH:-./data}/redis:/data
+    command: redis-server --requirepass ${REDIS_PASSWORD:-root} --appendonly yes
+    networks:
+      - redis_network
+
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-root}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-root}
+    volumes:
+      - ${DATA_PATH:-./data}/mongodb:/data/db
+    networks:
+      - mongodb_network
+
+  postgres-1:
+    image: postgres:15
+    container_name: postgres-1
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ${DATA_PATH:-./data}/postgres-1:/var/lib/postgresql/data
+    networks:
+      - postgres_network_1
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+  file-engine:
+    build:
+      context: ../
+      dockerfile: apps/file-engine/Dockerfile
+    image: nx-project/file-engine:latest
+    container_name: file-engine
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - SERVER_PORT=3001
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-admin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-123456789}
+      - MINIO_USE_SSL=false
+      - MINIO_REGION=us-east-1
+      - MINIO_DEFAULT_BUCKET=uploads
+      - UPLOAD_MAX_FILE_SIZE=104857600
+      - THUMBNAIL_MAX_SIZE=200
+      - THUMBNAIL_QUALITY=80
+    depends_on:
+      - minio
+    networks:
+      - minio_network
+      - file_engine_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health/live"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-admin}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-admin123}
+      - RABBITMQ_DEFAULT_VHOST=/
+    volumes:
+      - ${DATA_PATH:-./data}/rabbitmq:/var/lib/rabbitmq
+    networks:
+      - rabbitmq_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  worker-engine:
+    build:
+      context: ../
+      dockerfile: apps/worker-engine/Dockerfile
+    image: nx-project/worker-engine:latest
+    container_name: worker-engine
+    restart: always
+    environment:
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin123}@rabbitmq:5672/
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-admin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-123456789}
+      - MINIO_USE_SSL=false
+      - POSTGRES_HOST=postgres-1
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - MONGODB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-root}@mongodb:27017
+      - WORKER_CONCURRENCY=5
+    depends_on:
+      - rabbitmq
+      - minio
+      - postgres-1
+      - mongodb
+    networks:
+      - rabbitmq_network
+      - minio_network
+      - postgres_network_1
+      - mongodb_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health/live"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+networks:
+  message-queue:
+    driver: bridge
+  minio_network:
+    driver: bridge
+  redis_network:
+    driver: bridge
+  mongodb_network:
+    driver: bridge
+  postgres_network_1:
+    driver: bridge
+  file_engine_network:
+    driver: bridge
+  rabbitmq_network:
+    driver: bridge
+volumes:

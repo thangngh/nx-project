@@ -1,109 +1,284 @@
-# NxProject
+# 🚀 NX-Project Monorepo
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+Enterprise-grade monorepo được xây dựng với **Nx**, **NestJS**, **Next.js**, **React**, và **Golang**.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+## 📋 Mục Lục
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/js?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+- [Tổng Quan](#tổng-quan)
+- [Kiến Trúc](#kiến-trúc)
+- [Cài Đặt](#cài-đặt)
+- [Quick Start](#quick-start)
+- [Scripts](#scripts)
+- [Cấu Trúc Thư Mục](#cấu-trúc-thư-mục)
+- [Tài Liệu Chi Tiết](#tài-liệu-chi-tiết)
 
-## Generate a library
+---
 
-```sh
-npx nx g @nx/nest:lib configs --publishable --importPath=@shope-hehe/configs
+## Tổng Quan
+
+### Tech Stack
+
+| Layer | Technology | Mục đích |
+|-------|------------|----------|
+| **Frontend** | Next.js 16, React 19, Vite | Portal (SEO), Admin Dashboard |
+| **Backend** | NestJS 11, TypeScript | Microservices, REST/GraphQL APIs |
+| **Core Engine** | Golang 1.23 | High-performance file processing |
+| **Message Queue** | Apache Kafka | Event streaming, service decoupling |
+| **Databases** | PostgreSQL, MongoDB, Redis | Read models, Event store, Cache |
+| **Object Storage** | MinIO (S3-compatible) | File storage |
+| **Tooling** | Nx 22, Yarn, Docker | Monorepo management, containerization |
+
+### Nguyên Tắc Kiến Trúc
+
+- ✅ **Single Responsibility**: Mỗi service/database một nhiệm vụ
+- ✅ **Event Sourcing & CQRS**: Tách biệt read/write
+- ✅ **Microservices**: Loose coupling, high cohesion
+- ✅ **Polyglot**: TypeScript + Golang cho từng use case phù hợp
+
+---
+
+## Kiến Trúc
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CLIENTS                                     │
+│         Portal (Next.js)              Admin (React + Vite)              │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           API GATEWAY (NestJS)                           │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         ▼                          ▼                          ▼
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│   User Service  │      │  Order Service  │      │  File Engine    │
+│    (NestJS)     │      │    (NestJS)     │      │    (Golang)     │
+└────────┬────────┘      └────────┬────────┘      └────────┬────────┘
+         │                        │                        │
+         ▼                        ▼                        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         INFRASTRUCTURE                                   │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
+│  │  Kafka  │  │ Postgres│  │ MongoDB │  │  Redis  │  │  MinIO  │       │
+│  │(Events) │  │ (Query) │  │(Events) │  │ (Cache) │  │ (Files) │       │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘       │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Run tasks
+---
 
-To build the library use:
+## Cài Đặt
 
-```sh
-npx nx build pkg1
+### Yêu Cầu
+
+- **Node.js** >= 20.x
+- **Yarn** >= 1.22
+- **Go** >= 1.23 (cho File Engine)
+- **Docker** & **Docker Compose**
+
+### Bước 1: Clone và cài đặt dependencies
+
+```bash
+git clone <repository-url>
+cd nx-project
+
+# Cài đặt Node.js dependencies
+yarn install
+
+# Cài đặt Go dependencies
+yarn go:tidy
 ```
 
-To run any task with Nx use:
+### Bước 2: Cấu hình môi trường
 
-```sh
-npx nx <target> <project-name>
+```bash
+# Copy file cấu hình mẫu
+cp .docker/.env.example .docker/.env
+
+# Chỉnh sửa các giá trị nếu cần
+# nano .docker/.env
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+### Bước 3: Khởi động infrastructure
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+# Khởi động tất cả services (databases, message queue, etc.)
+yarn docker:up
 
-## Versioning and releasing
-
-To version and release the library use
-
-```
-npx nx release
+# Hoặc chỉ khởi động infrastructure (không build apps)
+yarn docker:infra
 ```
 
-Pass `--dry-run` to see what would happen without actually releasing the library.
+---
 
-[Learn more about Nx release &raquo;](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Quick Start
 
-## Keep TypeScript project references up to date
+### Development
 
-Nx automatically updates TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html) in `tsconfig.json` files to ensure they remain accurate based on your project dependencies (`import` or `require` statements). This sync is automatically done when running tasks such as `build` or `typecheck`, which require updated references to function correctly.
+```bash
+# 1. Khởi động infrastructure
+yarn docker:infra
 
-To manually trigger the process to sync the project graph dependencies information to the TypeScript project references, run the following command:
+# 2. Chạy NestJS Gateway
+yarn dev:gateway
 
-```sh
-npx nx sync
+# 3. Chạy Golang File Engine (terminal khác)
+yarn go:file-engine:dev
+
+# 4. Chạy Frontend Portal (terminal khác)
+yarn nx serve portal
+
+# 5. Chạy Frontend Admin (terminal khác)
+yarn nx serve admin
 ```
 
-You can enforce that the TypeScript project references are always in the correct state when running in CI by adding a step to your CI job configuration that runs the following command:
+### Kiểm tra services
 
-```sh
-npx nx sync:check
+| Service | URL |
+|---------|-----|
+| Gateway API | http://localhost:3000/api |
+| File Engine | http://localhost:3001 |
+| Portal | http://localhost:4200 |
+| Admin | http://localhost:4201 |
+| Kafka UI | http://localhost:8080 |
+| MinIO Console | http://localhost:9001 |
+
+---
+
+## Scripts
+
+### 🐳 Docker Commands
+
+| Script | Mô tả |
+|--------|-------|
+| `yarn docker:up` | Khởi động tất cả containers |
+| `yarn docker:down` | Dừng tất cả containers |
+| `yarn docker:logs` | Xem logs (tất cả services) |
+| `yarn docker:ps` | Liệt kê container status |
+| `yarn docker:infra` | Chỉ khởi động infrastructure |
+| `yarn docker:build` | Build lại images |
+
+### 🔷 Golang Commands
+
+| Script | Mô tả |
+|--------|-------|
+| `yarn go:file-engine:dev` | Chạy File Engine (dev mode) |
+| `yarn go:file-engine:build` | Build binary |
+| `yarn go:tidy` | Sync tất cả Go modules |
+| `yarn docker:file-engine` | Build & run File Engine container |
+
+### 📦 Nx Commands
+
+| Script | Mô tả |
+|--------|-------|
+| `yarn dev` | Chạy app (chọn từ prompt) |
+| `yarn dev:gateway` | Chạy Gateway API |
+| `yarn build:all` | Build tất cả projects |
+| `yarn test:all` | Test tất cả projects |
+| `yarn lint:all` | Lint tất cả projects |
+| `yarn graph` | Xem dependency graph |
+
+### 🏗️ Generators
+
+| Script | Mô tả |
+|--------|-------|
+| `yarn gen:lib <name>` | Tạo TypeScript library |
+| `yarn gen:shared-lib <name>` | Tạo shared library |
+| `yarn gen:nest-app <name>` | Tạo NestJS app |
+
+---
+
+## Cấu Trúc Thư Mục
+
+```
+nx-project/
+├── apps/                          # Applications
+│   ├── gateway/                   # NestJS API Gateway
+│   ├── file-engine/               # Golang File Processing
+│   └── clients/
+│       ├── portal/                # Next.js Portal (SEO)
+│       └── admin/                 # React Admin Dashboard
+│
+├── libs/                          # Shared Libraries
+│   ├── ts/                        # TypeScript libs (NestJS)
+│   │   ├── config/                # Configuration module
+│   │   ├── guard/                 # Auth guards
+│   │   ├── interceptor/           # HTTP interceptors
+│   │   ├── cache/                 # Cache service
+│   │   ├── queue/                 # Queue service
+│   │   └── ...
+│   ├── shared/ts/                 # Shared across frontend/backend
+│   │   └── logger/                # Winston logger
+│   ├── frontend/                  # Frontend libs (React)
+│   │   ├── ui/                    # Shared UI components
+│   │   └── hook/                  # Shared hooks
+│   └── golang/                    # Golang libs
+│       ├── common/                # Logger, config, errors
+│       ├── minio-client/          # MinIO wrapper
+│       └── image-processor/       # Image manipulation
+│
+├── .docker/                       # Docker configuration
+│   ├── docker-compose.yaml        # Service definitions
+│   ├── .env.example               # Environment template
+│   └── INFRASTRUCTURE.md          # Infrastructure docs
+│
+├── go.work                        # Go workspace
+├── package.json                   # Node scripts & deps
+├── nx.json                        # Nx configuration
+└── tsconfig.base.json             # TypeScript base config
 ```
 
-[Learn more about nx sync](https://nx.dev/reference/nx-commands#sync)
+---
 
-## Set up CI!
+## Tài Liệu Chi Tiết
 
-### Step 1
+| Tài liệu | Mô tả |
+|----------|-------|
+| [📦 INFRASTRUCTURE.md](.docker/INFRASTRUCTURE.md) | Chi tiết về Docker services, databases, networking |
+| [📚 MONOREPO_OVERVIEW.md](MONOREPO_OVERVIEW.md) | Tổng quan về cấu trúc monorepo |
+| [🚀 QUICK_START.md](QUICK_START.md) | Hướng dẫn bắt đầu nhanh |
+| [📖 libs/ts/NEW_LIBRARIES.md](libs/ts/NEW_LIBRARIES.md) | Danh sách và cách sử dụng TypeScript libs |
 
-To connect to Nx Cloud, run the following command:
+---
 
-```sh
-npx nx connect
+## Environment Variables
+
+Tất cả biến môi trường được quản lý trong `.docker/.env`. Xem file `.docker/.env.example` để biết đầy đủ các biến:
+
+| Category | Variables |
+|----------|-----------|
+| **Storage** | `DATA_PATH` |
+| **PostgreSQL** | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` |
+| **Redis** | `REDIS_PASSWORD` |
+| **MongoDB** | `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD` |
+| **MinIO** | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` |
+
+---
+
+## Contributing
+
+1. Tạo branch từ `main`: `git checkout -b feature/my-feature`
+2. Commit changes: `git commit -m 'feat: add some feature'`
+3. Push branch: `git push origin feature/my-feature`
+4. Tạo Pull Request
+
+### Commit Convention
+
+Sử dụng [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat: add new feature
+fix: bug fix
+docs: documentation changes
+refactor: code refactoring
+test: add tests
+chore: maintenance tasks
 ```
 
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+---
 
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## License
 
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
-```
-
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/nx-api/js?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+MIT License - see [LICENSE](LICENSE) for details.

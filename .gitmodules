@@ -1,0 +1,9 @@
+[submodule "libs/golang"]
+	path = libs/golang
+	url = https://github.com/thangngh/libs-engineer.git
+[submodule "apps/file-engineer"]
+	path = apps/file-engineer
+	url = https://github.com/thangngh/file-engineer.git
+[submodule "apps/worker-engineer"]
+	path = apps/worker-engineer
+	url = https://github.com/thangngh/worker-engineer.git

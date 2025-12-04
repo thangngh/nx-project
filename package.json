@@ -24,7 +24,34 @@
     "graph": "nx graph",
     "dep-graph": "nx dep-graph",
     "clean": "nx reset",
-    "clean:all": "nx reset && rm -rf node_modules dist"
+    "clean:all": "nx reset && rm -rf node_modules dist",
+    "init": "yarn install && nx reset",
+
+    "docker:up": "cd .docker && docker-compose up -d",
+    "docker:down": "cd .docker && docker-compose down",
+    "docker:logs": "cd .docker && docker-compose logs -f",
+    "docker:ps": "cd .docker && docker-compose ps",
+    "docker:restart": "cd .docker && docker-compose restart",
+    "docker:build": "cd .docker && docker-compose build",
+    "docker:pull": "cd .docker && docker-compose pull",
+
+    "docker:infra": "cd .docker && docker-compose up -d zookeeper kafka kafka-ui redis mongodb postgres-1 minio rabbitmq",
+    "docker:infra:down": "cd .docker && docker-compose down zookeeper kafka kafka-ui redis mongodb postgres-1 minio rabbitmq",
+
+    "go:file-engine:dev": "cd apps/file-engine && go run ./cmd/main.go",
+    "go:file-engine:build": "cd apps/file-engine && go build -o bin/file-engine ./cmd/main.go",
+    "go:worker-engine:dev": "cd apps/worker-engine && go run ./cmd/main.go",
+    "go:worker-engine:build": "cd apps/worker-engine && go build -o bin/worker-engine ./cmd/main.go",
+    "go:tidy": "go work sync && cd libs/golang/common && go mod tidy && cd ../minio-client && go mod tidy && cd ../image-processor && go mod tidy && cd ../rabbitmq-client && go mod tidy && cd ../../../apps/file-engine && go mod tidy && cd ../worker-engine && go mod tidy",
+    
+    "docker:file-engine": "cd .docker && docker-compose up -d --build file-engine",
+    "docker:file-engine:logs": "cd .docker && docker-compose logs -f file-engine",
+    "docker:worker-engine": "cd .docker && docker-compose up -d --build worker-engine",
+    "docker:worker-engine:logs": "cd .docker && docker-compose logs -f worker-engine",
+    "docker:rabbitmq:ui": "echo 'RabbitMQ UI: http://localhost:15672 (admin/admin123)'",
+
+    "dev:file-service": "nx serve file-service",
+    "dev:worker-service": "nx serve worker-service"
   },
   "private": true,
   "devDependencies": {
@@ -45,7 +72,7 @@
     "@nx/react": "^22.1.3",
     "@nx/vite": "^22.1.3",
     "@nx/vitest": "22.1.3",
-    "@nx/web": "22.1.3",
+    "@nx/web": "^22.1.3",
     "@nx/webpack": "22.1.0",
     "@swc-node/register": "~1.9.1",
     "@swc/cli": "~0.6.0",
@@ -109,13 +136,21 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@reduxjs/toolkit": "^2.11.0",
     "axios": "^1.6.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.555.0",
     "next": "~16.0.1",
+    "next-auth": "^4.24.13",
+    "next-pwa": "^5.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "6.29.0",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
+    "tailwind-merge": "^3.4.0",
+    "vite-plugin-pwa": "^1.2.0",
     "winston": "^3.18.3"
   },
   "nx": {

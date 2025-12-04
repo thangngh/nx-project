@@ -51,3 +51,30 @@ out
 
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.docker/.env
+!.docker/.env.example
+
+# Docker data
+.docker/data/
+.docker/logs/
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+apps/file-engine/bin/
+libs/golang/**/bin/
+
+# Go test binary
+*.test
+
+# Go coverage
+*.out
+

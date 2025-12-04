@@ -1,0 +1,66 @@
+{
+  "name": "@nx-project/worker-service",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "targets": {
+      "build": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "webpack-cli build",
+          "args": ["--node-env=production"],
+          "cwd": "apps/worker-service"
+        },
+        "configurations": {
+          "development": {
+            "args": ["--node-env=development"]
+          }
+        }
+      },
+      "serve": {
+        "continuous": true,
+        "executor": "@nx/js:node",
+        "defaultConfiguration": "development",
+        "dependsOn": ["build"],
+        "options": {
+          "buildTarget": "@nx-project/worker-service:build",
+          "runBuildTargetDependencies": false
+        },
+        "configurations": {
+          "development": {
+            "buildTarget": "@nx-project/worker-service:build:development"
+          },
+          "production": {
+            "buildTarget": "@nx-project/worker-service:build:production"
+          }
+        }
+      },
+      "test": {
+        "executor": "@nx/jest:jest",
+        "outputs": ["{projectRoot}/test-output/jest/coverage"],
+        "options": {
+          "jestConfig": "apps/worker-service/jest.config.cts",
+          "passWithNoTests": true
+        }
+      }
+    },
+    "tags": ["scope:worker-service", "type:app"]
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "minio": "^8.0.2",
+    "amqplib": "^0.10.5",
+    "csv-parse": "^5.5.0",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.0",
+    "uuid": "^11.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.0.0",
+    "@types/amqplib": "^0.10.5",
+    "@types/uuid": "^10.0.0"
+  }
+}

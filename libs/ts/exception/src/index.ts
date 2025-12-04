@@ -1,3 +1,3 @@
-export * from './lib/exception.module';
-export * from './lib/filters';
-export * from './lib/exceptions';
+export * from './lib/exception.module.ts';
+export * from './lib/filters/index.ts';
+export * from './lib/exceptions/index.ts';

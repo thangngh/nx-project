@@ -1,1 +1,1 @@
-export * from './lib/hook';
+export * from './lib/hook.tsx';

@@ -1,0 +1,10 @@
+go 1.23
+
+use (
+	./apps/file-engine
+	./apps/worker-engine
+	./libs/golang/common
+	./libs/golang/minio-client
+	./libs/golang/image-processor
+	./libs/golang/rabbitmq-client
+)
