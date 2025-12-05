@@ -19,7 +19,8 @@
     "customConditions": ["@nx-project/source"],
     "paths": {
       "@nx-project/minio": ["libs/ts/minio/src/index.ts"],
-      "@nx-project/rabbitmq": ["libs/ts/rabbitmq/src/index.ts"]
+      "@nx-project/rabbitmq": ["libs/ts/rabbitmq/src/index.ts"],
+      "@nx-project/shared-logger": ["libs/shared/ts/logger/src/index.ts"]
     }
   }
 }

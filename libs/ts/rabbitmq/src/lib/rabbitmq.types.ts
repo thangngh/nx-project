@@ -1,12 +1,14 @@
 import { JobType } from './rabbitmq.queues.ts';
 
-export enum JobStatus {
-  PENDING = 'PENDING',
-  PROCESSING = 'PROCESSING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-  RETRYING = 'RETRYING',
-}
+export const JobStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  RETRYING: 'RETRYING',
+} as const;
+
+export type JobStatus = typeof JobStatus[keyof typeof JobStatus];
 
 export interface Job<T = Record<string, any>> {
   id: string;

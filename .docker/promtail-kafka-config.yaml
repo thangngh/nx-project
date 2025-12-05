@@ -1,0 +1,151 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+  graceful_shutdown_timeout: 60s
+
+# WAL configuration - Write-Ahead Log
+wal:
+  enabled: true
+  dir: /tmp/wal
+  segment_age: 10m
+  max_segment_age: 1h
+
+# Positions tracking
+positions:
+  filename: /tmp/positions.yaml
+  sync_period: 10s
+  ignore_invalid_yaml: true
+
+# KAFKA CLIENT - Gửi logs vào Kafka thay vì trực tiếp vào Loki
+# Kafka acts as a buffer, ensuring NO DATA LOSS
+clients:
+  - url: kafka://kafka:29092/logging-events
+    
+    # Kafka configuration
+    kafka_config:
+      # Broker addresses
+      brokers:
+        - kafka:29092
+      
+      # Topic configuration
+      topic: logging-events
+      
+      # Producer configuration để đảm bảo reliability
+      producer_config:
+        # Require acknowledgment from all in-sync replicas
+        # Đảm bảo message được lưu vào disk trước khi ACK
+        required_acks: all  # -1 = all replicas
+        
+        # Compression để giảm network bandwidth
+        compression: snappy
+        
+        # Max message size (10MB)
+        max_message_bytes: 10485760
+        
+        # Retry configuration
+        retry_max: 10
+        retry_backoff: 100ms
+        
+        # Timeout
+        timeout: 30s
+        
+        # Idempotent producer để tránh duplicate
+        idempotent: true
+        
+        # Batching configuration
+        batch_size: 16384    # 16KB
+        batch_timeout: 10ms
+        
+        # Buffer configuration
+        buffer_memory: 33554432  # 32MB
+      
+      # Consumer group (cho testing)
+      consumer_group: promtail-consumer-group
+      
+      # Partition strategy
+      partitioning_strategy: hash  # Hash by stream labels
+    
+    # Timeout cho Kafka operations
+    timeout: 30s
+    
+    # Batch configuration
+    batchwait: 1s
+    batchsize: 102400  # 100KB
+    
+    # Backoff nếu Kafka unavailable
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+    
+    # External labels
+    external_labels:
+      cluster: 'nx-project'
+      environment: '${ENVIRONMENT:-production}'
+      pipeline: 'kafka-buffered'
+
+scrape_configs:
+  # Docker containers
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+      - source_labels: ['__meta_docker_container_image']
+        target_label: 'image'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'compose_project'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'compose_service'
+      - source_labels: ['__meta_docker_container_label_logging_jobname']
+        target_label: 'job'
+      - source_labels: ['__meta_docker_container_label_environment']
+        target_label: 'environment'
+      - source_labels: ['__meta_docker_container_label_app']
+        target_label: 'app'
+
+  # NestJS application logs
+  - job_name: nestjs-apps
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nestjs
+          __path__: /var/log/apps/*.log
+    pipeline_stages:
+      # Parse JSON
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            context: context
+            trace_id: trace_id
+            span_id: span_id
+            request_id: request_id
+            user_id: user_id
+      
+      # Extract timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      
+      # Add labels for better querying
+      - labels:
+          level:
+          context:
+      
+      # Add trace info to labels if present
+      - labels:
+          trace_id:
+          span_id:
+      
+      # Output
+      - output:
+          source: message

@@ -1,0 +1,144 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+  # Disable graceful shutdown để đảm bảo tất cả logs được gửi
+  graceful_shutdown_timeout: 60s
+
+# WAL (Write-Ahead Log) configuration để đảm bảo không mất logs
+# Promtail sẽ write logs vào disk trước khi gửi lên Loki
+# Nếu Loki down, logs sẽ được queue và gửi lại khi Loki up
+wal:
+  enabled: true
+  dir: /tmp/wal
+  # Retention của WAL segments
+  segment_age: 10m
+  # Max size của WAL
+  max_segment_age: 1h
+
+# Positions file tracking - quan trọng để không đọc lại logs cũ
+positions:
+  filename: /tmp/positions.yaml
+  # Sync positions file mỗi 10s để không bị loss tracking
+  sync_period: 10s
+  # Ignore invalid positions (defensive)
+  ignore_invalid_yaml: true
+
+# Client configuration với retry và backoff
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    
+    # Timeout configuration
+    timeout: 30s
+    
+    # Batch configuration - gửi theo batch để hiệu quả hơn
+    batchwait: 1s      # Đợi tối đa 1s để tạo batch
+    batchsize: 102400  # 100KB batch size
+    
+    # Retry configuration - QUAN TRỌNG để không mất logs
+    backoff_config:
+      min_period: 500ms    # Retry sau 500ms
+      max_period: 5m       # Retry tối đa sau 5 phút
+      max_retries: 10      # Retry tối đa 10 lần
+    
+    # External labels - thêm vào tất cả logs
+    external_labels:
+      cluster: 'nx-project'
+      environment: '${ENVIRONMENT:-dev}'
+    
+    # Tenant ID (nếu sử dụng Loki multi-tenant)
+    # tenant_id: 'tenant-1'
+
+scrape_configs:
+  # Scrape logs from Docker containers
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Extract container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      
+      # Extract container ID
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+      
+      # Extract image name
+      - source_labels: ['__meta_docker_container_image']
+        target_label: 'image'
+      
+      # Extract compose project
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'compose_project'
+      
+      # Extract compose service
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'compose_service'
+      
+      # Extract custom labels
+      - source_labels: ['__meta_docker_container_label_logging_jobname']
+        target_label: 'job'
+      
+      # Extract environment
+      - source_labels: ['__meta_docker_container_label_environment']
+        target_label: 'environment'
+      
+      # Extract app name
+      - source_labels: ['__meta_docker_container_label_app']
+        target_label: 'app'
+
+  # Scrape logs from files (example for NestJS apps)
+  - job_name: nestjs-apps
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nestjs
+          __path__: /var/log/apps/*.log
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            context: context
+            trace_id: trace_id
+            span_id: span_id
+      
+      # Set timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      
+      # Add labels
+      - labels:
+          level:
+          context:
+      
+      # Output only message
+      - output:
+          source: message
+
+  # Scrape system logs (if needed)
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          __path__: /var/log/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="system"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\S+\s+\S+)\s+(?P<hostname>\S+)\s+(?P<application>\S+):\s+(?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: 'Jan 02 15:04:05'
+            - labels:
+                hostname:
+                application:

@@ -1,0 +1,239 @@
+version: '3.8'
+
+# HIGH AVAILABILITY LOGGING STACK
+# Với Kafka làm buffer để đảm bảo ZERO data loss
+
+networks:
+  monitoring:
+    driver: bridge
+  message-queue:
+    external: true
+    name: message-queue
+
+services:
+  # ============================================================================
+  # TIER 1: LOG COLLECTORS (Promtail instances)
+  # ============================================================================
+  
+  promtail:
+    image: grafana/promtail:2.9.3
+    container_name: promtail
+    volumes:
+      - ./promtail-kafka-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./logs:/var/log/apps:ro
+      - ${DATA_PATH}/promtail:/tmp
+      - ${DATA_PATH}/promtail-wal:/tmp/wal
+      - /var/log:/var/log:ro
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - monitoring
+      - message-queue
+    restart: unless-stopped
+    labels:
+      logging.jobname: "promtail"
+      app: "promtail"
+      environment: "production"
+  
+  # ============================================================================
+  # TIER 2: MESSAGE QUEUE BUFFER (Kafka)
+  # ============================================================================
+  # Kafka acts as a buffer between Promtail and Loki
+  # Ensures no data loss even if Loki is down
+  # Logs are persisted in Kafka topics with retention
+  
+  # NOTE: Kafka và Zookeeper đã được định nghĩa trong docker-compose.yaml chính
+  # Chỉ cần ensure chúng đang chạy và accessible
+  
+  # ============================================================================
+  # TIER 3: LOG AGGREGATOR (Loki với HA)
+  # ============================================================================
+  
+  # Loki Read Instance (Query Path)
+  loki-read:
+    image: grafana/loki:2.9.3
+    container_name: loki-read
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-ha-config.yaml:/etc/loki/config.yaml:ro
+      - ${DATA_PATH}/loki:/tmp/loki
+      - ./logs:/var/log/apps:ro
+    command: -config.file=/etc/loki/config.yaml -target=read
+    networks:
+      - monitoring
+      - message-queue
+    restart: unless-stopped
+    environment:
+      - LOKI_MODE=read
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      logging.jobname: "loki-read"
+      app: "loki"
+      environment: "production"
+      tier: "read"
+  
+  # Loki Write Instance (Ingestion Path)
+  loki-write:
+    image: grafana/loki:2.9.3
+    container_name: loki-write
+    volumes:
+      - ./loki-ha-config.yaml:/etc/loki/config.yaml:ro
+      - ${DATA_PATH}/loki:/tmp/loki
+    command: -config.file=/etc/loki/config.yaml -target=write
+    networks:
+      - monitoring
+      - message-queue
+    restart: unless-stopped
+    environment:
+      - LOKI_MODE=write
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      logging.jobname: "loki-write"
+      app: "loki"
+      environment: "production"
+      tier: "write"
+  
+  # Kafka Consumer -> Loki Writer
+  # Đọc logs từ Kafka và ghi vào Loki
+  loki-kafka-consumer:
+    image: grafana/loki-kafka-consumer:latest
+    container_name: loki-kafka-consumer
+    volumes:
+      - ./loki-kafka-consumer-config.yaml:/etc/loki/config.yaml:ro
+    command: -config.file=/etc/loki/config.yaml
+    networks:
+      - monitoring
+      - message-queue
+    depends_on:
+      loki-write:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC=logging-events
+      - KAFKA_GROUP_ID=loki-consumer-group
+      - LOKI_URL=http://loki-write:3100/loki/api/v1/push
+    labels:
+      logging.jobname: "loki-kafka-consumer"
+      app: "loki-consumer"
+      environment: "production"
+  
+  # ============================================================================
+  # TIER 4: VISUALIZATION (Grafana)
+  # ============================================================================
+  
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ${DATA_PATH}/grafana:/var/lib/grafana
+      - ./grafana-datasources-ha.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    networks:
+      - monitoring
+    depends_on:
+      loki-read:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      logging.jobname: "grafana"
+      app: "grafana"
+      environment: "production"
+  
+  # ============================================================================
+  # MONITORING: Prometheus + Alertmanager
+  # ============================================================================
+  
+  # Prometheus - Monitor the monitoring stack itself
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-logging
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus-logging.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-alerts.yaml:/etc/prometheus/prometheus-alerts.yaml:ro
+      - ${DATA_PATH}/prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - monitoring
+    restart: unless-stopped
+    labels:
+      logging.jobname: "prometheus"
+      app: "prometheus"
+      environment: "production"
+  
+  # Alertmanager - Alert khi có vấn đề với logging pipeline
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager-logging
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager-config.yaml:/etc/alertmanager/config.yml:ro
+      - ${DATA_PATH}/alertmanager:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - monitoring
+    restart: unless-stopped
+    labels:
+      logging.jobname: "alertmanager"
+      app: "alertmanager"
+      environment: "production"
+  
+  # ============================================================================
+  # HOST METRICS EXPORTER - Monitor CPU/RAM/Disk
+  # ============================================================================
+  
+  # Node Exporter - Collect host system metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/host/root'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    networks:
+      - monitoring
+    restart: unless-stopped
+    labels:
+      logging.jobname: "node-exporter"
+      app: "node-exporter"
+      environment: "production"

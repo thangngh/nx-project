@@ -1,19 +1,24 @@
-import { DynamicModule, Global, Module } from '@nestjs/common';
-import { LoggerService, LoggerConfig } from './logger.service.ts';
+import { Module, Global } from '@nestjs/common';
+import { JsonLoggerService } from './json-logger.service.ts';
 
+/**
+ * Logger module providing JSON structured logging
+ * 
+ * Usage:
+ * 
+ * Import in your app module:
+ * @Module({
+ *   imports: [LoggerModule],
+ * })
+ * 
+ * Use in services:
+ * constructor(private readonly logger: JsonLoggerService) {
+ *   this.logger.setContext('MyService');
+ * }
+ */
 @Global()
-@Module({})
-export class LoggerModule {
-  static forRoot(config: LoggerConfig): DynamicModule {
-    return {
-      module: LoggerModule,
-      providers: [
-        {
-          provide: LoggerService,
-          useValue: new LoggerService(config),
-        },
-      ],
-      exports: [LoggerService],
-    };
-  }
-}
+@Module({
+  providers: [JsonLoggerService],
+  exports: [JsonLoggerService],
+})
+export class LoggerModule { }

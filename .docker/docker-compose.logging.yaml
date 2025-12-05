@@ -1,0 +1,110 @@
+version: '3.8'
+
+networks:
+  monitoring:
+    driver: bridge
+
+services:
+  # Loki - Log aggregation system
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: loki
+    ports:
+      - "3100:3100"
+      - "9096:9096"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/config.yaml:ro
+      - ${DATA_PATH}/loki:/tmp/loki
+      - ./logs:/var/log/apps:ro
+    command: -config.file=/etc/loki/config.yaml
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      logging.jobname: "loki"
+      app: "loki"
+      environment: "dev"
+
+  # Promtail - Log collector
+  promtail:
+    image: grafana/promtail:2.9.3
+    container_name: promtail
+    volumes:
+      - ./promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./logs:/var/log/apps:ro
+      - ${DATA_PATH}/promtail:/tmp
+      - ${DATA_PATH}/promtail-wal:/tmp/wal
+      - /var/log:/var/log:ro
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - monitoring
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+    labels:
+      logging.jobname: "promtail"
+      app: "promtail"
+      environment: "dev"
+
+  # Grafana - Visualization platform
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ${DATA_PATH}/grafana:/var/lib/grafana
+      - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_ALLOW_ORG_CREATE=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    networks:
+      - monitoring
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      logging.jobname: "grafana"
+      app: "grafana"
+      environment: "dev"
+
+  # Log Generator (for testing) - Tạo logs mẫu
+  log-generator:
+    image: mingrammer/flog:0.4.3
+    container_name: log-generator
+    command: 
+      - --loop
+      - --format=json
+      - --number=100
+      - --delay=1s
+    volumes:
+      - ./logs:/var/log/apps
+    networks:
+      - monitoring
+    profiles:
+      - testing
+    labels:
+      logging.jobname: "log-generator"
+      app: "log-generator"
+      environment: "dev"

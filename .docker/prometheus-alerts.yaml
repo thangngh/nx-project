@@ -1,0 +1,319 @@
+# ⚠️ Resource Monitoring & Alerting Configuration
+# CPU / RAM / Disk thresholds cho Logging Stack
+
+groups:
+  # ============================================================================
+  # CPU MONITORING
+  # ============================================================================
+  - name: cpu_alerts
+    interval: 30s
+    rules:
+      # WARNING: High CPU usage (> 70%)
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_exporter_cpu_seconds_total{mode="idle"}[5m])) * 100) > 70
+        for: 5m
+        labels:
+          severity: warning
+          resource: cpu
+          service: "{{ $labels.instance }}"
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: |
+            CPU usage is {{ $value | humanize }}% on {{ $labels.instance }}.
+            Current threshold: 70%
+            Duration: 5 minutes
+          
+      # CRITICAL: Very high CPU usage (> 90%)
+      - alert: CriticalCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_exporter_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 2m
+        labels:
+          severity: critical
+          resource: cpu
+          service: "{{ $labels.instance }}"
+        annotations:
+          summary: "🚨 CRITICAL: CPU usage on {{ $labels.instance }}"
+          description: |
+            CPU usage is {{ $value | humanize }}% on {{ $labels.instance }}.
+            Current threshold: 90%
+            IMMEDIATE ACTION REQUIRED!
+            
+      # Loki specific CPU
+      - alert: LokiHighCPU
+        expr: |
+          rate(process_cpu_seconds_total{job="loki"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          resource: cpu
+          service: loki
+        annotations:
+          summary: "Loki high CPU usage"
+          description: "Loki CPU usage is {{ $value | humanize }}%"
+      
+      # Promtail specific CPU
+      - alert: PromtailHighCPU
+        expr: |
+          rate(process_cpu_seconds_total{job="promtail"}[5m]) * 100 > 50
+        for: 10m
+        labels:
+          severity: warning
+          resource: cpu
+          service: promtail
+        annotations:
+          summary: "Promtail high CPU usage"
+          description: "Promtail CPU usage is {{ $value | humanize }}%"
+      
+      # Kafka high CPU
+      - alert: KafkaHighCPU
+        expr: |
+          rate(process_cpu_seconds_total{job="kafka"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          resource: cpu
+          service: kafka
+        annotations:
+          summary: "Kafka high CPU usage"
+          description: "Kafka CPU usage is {{ $value | humanize }}%"
+
+  # ============================================================================
+  # MEMORY (RAM) MONITORING
+  # ============================================================================
+  - name: memory_alerts
+    interval: 30s
+    rules:
+      # WARNING: High memory usage (> 80%)
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          resource: memory
+          service: "{{ $labels.instance }}"
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: |
+            Memory usage is {{ $value | humanize }}% on {{ $labels.instance }}.
+            Available: {{ with query "node_memory_MemAvailable_bytes" }}{{ . | first | value | humanize1024 }}B{{ end }}
+            Total: {{ with query "node_memory_MemTotal_bytes" }}{{ . | first | value | humanize1024 }}B{{ end }}
+            Current threshold: 80%
+      
+      # CRITICAL: Very high memory usage (> 95%)
+      - alert: CriticalMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          resource: memory
+          service: "{{ $labels.instance }}"
+        annotations:
+          summary: "🚨 CRITICAL: Memory exhaustion on {{ $labels.instance }}"
+          description: |
+            Memory usage is {{ $value | humanize }}% on {{ $labels.instance }}.
+            System may start OOM killing processes!
+            IMMEDIATE ACTION REQUIRED!
+      
+      # Loki memory
+      - alert: LokiHighMemory
+        expr: |
+          process_resident_memory_bytes{job="loki"} / 1024 / 1024 / 1024 > 4
+        for: 10m
+        labels:
+          severity: warning
+          resource: memory
+          service: loki
+        annotations:
+          summary: "Loki high memory usage"
+          description: "Loki is using {{ $value | humanize }}GB of RAM (threshold: 4GB)"
+      
+      # Grafana memory
+      - alert: GrafanaHighMemory
+        expr: |
+          process_resident_memory_bytes{job="grafana"} / 1024 / 1024 / 1024 > 2
+        for: 10m
+        labels:
+          severity: warning
+          resource: memory
+          service: grafana
+        annotations:
+          summary: "Grafana high memory usage"
+          description: "Grafana is using {{ $value | humanize }}GB of RAM (threshold: 2GB)"
+      
+      # Kafka memory
+      - alert: KafkaHighMemory
+        expr: |
+          process_resident_memory_bytes{job="kafka"} / 1024 / 1024 / 1024 > 8
+        for: 10m
+        labels:
+          severity: warning
+          resource: memory
+          service: kafka
+        annotations:
+          summary: "Kafka high memory usage"
+          description: "Kafka is using {{ $value | humanize }}GB of RAM (threshold: 8GB)"
+      
+      # Memory leak detection
+      - alert: PossibleMemoryLeak
+        expr: |
+          rate(process_resident_memory_bytes[1h]) > 0
+          and
+          rate(process_resident_memory_bytes[1h]) > 10485760  # 10MB/hour
+        for: 6h
+        labels:
+          severity: warning
+          resource: memory
+        annotations:
+          summary: "Possible memory leak detected in {{ $labels.job }}"
+          description: |
+            Memory usage is continuously growing in {{ $labels.job }}.
+            Growth rate: {{ $value | humanize }}B/s
+
+  # ============================================================================
+  # DISK MONITORING
+  # ============================================================================
+  - name: disk_alerts
+    interval: 1m
+    rules:
+      # WARNING: Disk usage > 75%
+      - alert: DiskSpaceWarning
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"} / node_filesystem_size_bytes)) * 100 > 75
+        for: 10m
+        labels:
+          severity: warning
+          resource: disk
+          service: "{{ $labels.instance }}"
+          mountpoint: "{{ $labels.mountpoint }}"
+        annotations:
+          summary: "Disk space warning on {{ $labels.instance }}"
+          description: |
+            Disk {{ $labels.mountpoint }} is {{ $value | humanize }}% full.
+            Available: {{ with query "node_filesystem_avail_bytes" }}{{ . | first | value | humanize1024 }}B{{ end }}
+            Total: {{ with query "node_filesystem_size_bytes" }}{{ . | first | value | humanize1024 }}B{{ end }}
+            Current threshold: 75%
+      
+      # CRITICAL: Disk usage > 90%
+      - alert: DiskSpaceCritical
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"} / node_filesystem_size_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          resource: disk
+          service: "{{ $labels.instance }}"
+          mountpoint: "{{ $labels.mountpoint }}"
+        annotations:
+          summary: "🚨 CRITICAL: Disk space critical on {{ $labels.instance }}"
+          description: |
+            Disk {{ $labels.mountpoint }} is {{ $value | humanize }}% full!
+            Services may fail soon!
+            IMMEDIATE CLEANUP REQUIRED!
+      
+      # Disk will fill in 4 hours
+      - alert: DiskWillFillIn4Hours
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"}[1h], 4*3600) < 0
+        for: 10m
+        labels:
+          severity: warning
+          resource: disk
+        annotations:
+          summary: "Disk {{ $labels.mountpoint }} will fill in 4 hours"
+          description: |
+            Based on current growth rate, disk {{ $labels.mountpoint }} will be full in ~4 hours.
+            Consider cleanup or expansion.
+      
+      # Loki data directory
+      - alert: LokiDiskSpaceWarning
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint=~".*/loki.*"} / node_filesystem_size_bytes{mountpoint=~".*/loki.*"})) * 100 > 70
+        for: 10m
+        labels:
+          severity: warning
+          resource: disk
+          service: loki
+        annotations:
+          summary: "Loki data directory disk space warning"
+          description: "Loki data directory is {{ $value | humanize }}% full. Consider increasing retention or storage."
+      
+      # Kafka data directory
+      - alert: KafkaDiskSpaceWarning
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint=~".*/kafka.*"} / node_filesystem_size_bytes{mountpoint=~".*/kafka.*"})) * 100 > 70
+        for: 10m
+        labels:
+          severity: warning
+          resource: disk
+          service: kafka
+        annotations:
+          summary: "Kafka data directory disk space warning"
+          description: "Kafka data directory is {{ $value | humanize }}% full. Adjust retention or add storage."
+      
+      # High disk I/O
+      - alert: HighDiskIO
+        expr: |
+          rate(node_disk_io_time_seconds_total[5m]) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          resource: disk
+        annotations:
+          summary: "High disk I/O on {{ $labels.instance }}"
+          description: "Disk {{ $labels.device }} has high I/O utilization: {{ $value | humanizePercentage }}"
+      
+      # Disk read/write errors
+      - alert: DiskReadWriteErrors
+        expr: |
+          rate(node_disk_read_errors_total[5m]) > 0
+          or
+          rate(node_disk_write_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          resource: disk
+        annotations:
+          summary: "Disk errors detected on {{ $labels.instance }}"
+          description: "Disk {{ $labels.device }} is experiencing read/write errors. Hardware issue possible!"
+
+  # ============================================================================
+  # INODE MONITORING (Important for log systems!)
+  # ============================================================================
+  - name: inode_alerts
+    interval: 5m
+    rules:
+      # WARNING: High inode usage (> 80%)
+      - alert: HighInodeUsage
+        expr: |
+          (1 - (node_filesystem_files_free / node_filesystem_files)) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          resource: inode
+        annotations:
+          summary: "High inode usage on {{ $labels.mountpoint }}"
+          description: |
+            Inode usage is {{ $value | humanize }}% on {{ $labels.mountpoint }}.
+            Many small files can cause this.
+            Consider cleanup or filesystem expansion.
+      
+      # CRITICAL: Very high inode usage (> 95%)
+      - alert: CriticalInodeUsage
+        expr: |
+          (1 - (node_filesystem_files_free / node_filesystem_files)) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          resource: inode
+        annotations:
+          summary: "🚨 CRITICAL: Inode exhaustion on {{ $labels.mountpoint }}"
+          description: |
+            Inode usage is {{ $value | humanize }}%.
+            Cannot create new files soon!
+            IMMEDIATE ACTION REQUIRED!
+
+# vim: set ft=yaml:
